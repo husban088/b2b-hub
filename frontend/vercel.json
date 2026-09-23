@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "node scripts/set-env.js && npm run build:prod",
+  "outputDirectory": "dist/b2b-integration-hub/browser",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

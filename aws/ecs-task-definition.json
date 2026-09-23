@@ -1,0 +1,44 @@
+{
+  "family": "b2b-integration-hub-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/b2bIntegrationHubTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/b2b-integration-hub-backend:latest",
+      "portMappings": [
+        { "containerPort": 8080, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "ASPNETCORE_ENVIRONMENT", "value": "Production" },
+        { "name": "AWS__Region", "value": "<REGION>" }
+      ],
+      "secrets": [
+        { "name": "MongoDb__ConnectionString", "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:b2b-hub/mongo-connection-string" },
+        { "name": "Cloudinary__CloudName", "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:b2b-hub/cloudinary-cloud-name" },
+        { "name": "Cloudinary__ApiKey", "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:b2b-hub/cloudinary-api-key" },
+        { "name": "Cloudinary__ApiSecret", "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:b2b-hub/cloudinary-api-secret" },
+        { "name": "Jwt__SecretKey", "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:b2b-hub/jwt-secret" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/b2b-integration-hub-backend",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    }
+  ]
+}

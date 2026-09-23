@@ -1,0 +1,75 @@
+<div class="page-head">
+  <h1>Overview</h1>
+  <p class="lede">
+    Everything moving between you and your partners, in one place.
+  </p>
+</div>
+
+<div class="dashboard-grid" *ngIf="!loading(); else loadingState">
+  <section class="hero-panel">
+    <div class="hero-top">
+      <span class="status-dot live"></span>
+      <span class="hero-label">Network status</span>
+    </div>
+    <h2>
+      {{ summary()?.connectedIntegrations ?? 0 }} of
+      {{ summary()?.totalIntegrations ?? 0 }} integrations connected
+    </h2>
+    <p class="hero-sub" *ngIf="(summary()?.failingIntegrations ?? 0) > 0">
+      {{ summary()?.failingIntegrations }} need attention.
+    </p>
+    <p class="hero-sub" *ngIf="(summary()?.failingIntegrations ?? 0) === 0">
+      No failures reported right now.
+    </p>
+  </section>
+
+  <div class="tile-stack">
+    <div class="tile">
+      <span class="tile-value">{{ summary()?.totalPartners ?? 0 }}</span>
+      <span class="tile-label">Partners</span>
+    </div>
+    <div class="tile">
+      <span class="tile-value">{{ summary()?.activePartners ?? 0 }}</span>
+      <span class="tile-label">Active</span>
+    </div>
+    <div class="tile">
+      <span class="tile-value">{{ summary()?.recentEvents ?? 0 }}</span>
+      <span class="tile-label">Recent events</span>
+    </div>
+  </div>
+
+  <section class="feed-panel panel">
+    <div class="feed-header">
+      <h3>Live activity</h3>
+      <span class="status-dot live"></span>
+    </div>
+
+    <div class="feed-empty" *ngIf="feed().length === 0">
+      Waiting for the next event — this list updates in real time as webhooks
+      arrive.
+    </div>
+
+    <ul class="feed-list" *ngIf="feed().length > 0">
+      <li *ngFor="let event of feed(); trackBy: trackById">
+        <span
+          class="status-dot"
+          [ngClass]="event.success ? 'live' : 'danger'"
+        ></span>
+        <div class="feed-body">
+          <span class="feed-title">{{ event.eventType }}</span>
+          <span class="feed-meta"
+            >{{ event.direction }} · {{ event.statusCode }} ·
+            {{ event.receivedAt | date: "short" }}</span
+          >
+          <span class="feed-payload" *ngIf="event.payload">{{
+            event.payload
+          }}</span>
+        </div>
+      </li>
+    </ul>
+  </section>
+</div>
+
+<ng-template #loadingState>
+  <p class="loading-text">Loading your network…</p>
+</ng-template>

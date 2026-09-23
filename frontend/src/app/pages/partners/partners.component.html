@@ -1,0 +1,114 @@
+<div class="page-head row">
+  <div>
+    <h1>Partners</h1>
+    <p class="lede">The companies you exchange data with.</p>
+  </div>
+  <button class="btn btn-primary" (click)="toggleForm()">
+    {{ showForm() ? "Cancel" : "+ New partner" }}
+  </button>
+</div>
+
+<section class="panel form-panel" *ngIf="showForm()">
+  <form (ngSubmit)="createPartner()" #f="ngForm">
+    <div class="form-grid">
+      <div class="field">
+        <label for="companyName">Company name</label>
+        <input
+          id="companyName"
+          name="companyName"
+          [(ngModel)]="form.companyName"
+          required
+        />
+      </div>
+      <div class="field">
+        <label for="companyEmail">Company email</label>
+        <input
+          id="companyEmail"
+          name="companyEmail"
+          type="email"
+          [(ngModel)]="form.companyEmail"
+          required
+        />
+      </div>
+      <div class="field">
+        <label for="country">Country</label>
+        <input
+          id="country"
+          name="country"
+          [(ngModel)]="form.country"
+          required
+        />
+      </div>
+      <div class="field">
+        <label for="industry">Industry</label>
+        <input
+          id="industry"
+          name="industry"
+          [(ngModel)]="form.industry"
+          required
+        />
+      </div>
+    </div>
+    <button
+      type="submit"
+      class="btn btn-primary"
+      [disabled]="saving() || f.invalid"
+    >
+      {{ saving() ? "Saving…" : "Create partner" }}
+    </button>
+  </form>
+</section>
+
+<section class="panel table-panel">
+  <table class="data-table" *ngIf="!loading(); else loadingState">
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Country</th>
+        <th>Industry</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let partner of partners()">
+        <td data-label="Company">
+          <div class="company-cell">
+            <span class="company-name">{{ partner.companyName }}</span>
+            <span class="company-email">{{ partner.companyEmail }}</span>
+          </div>
+        </td>
+        <td data-label="Country">{{ partner.country }}</td>
+        <td data-label="Industry">{{ partner.industry }}</td>
+        <td data-label="Status">
+          <div class="status-cell">
+            <span
+              class="status-dot"
+              [ngClass]="statusClass(partner.status)"
+            ></span>
+            <select
+              [ngModel]="partner.status"
+              (ngModelChange)="changeStatus(partner, $event)"
+            >
+              <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+            </select>
+          </div>
+        </td>
+        <td class="actions-cell">
+          <button class="btn btn-danger" (click)="remove(partner)">
+            Remove
+          </button>
+        </td>
+      </tr>
+      <tr *ngIf="partners().length === 0">
+        <td colspan="5" class="empty-row">
+          No partners yet — add your first one above.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <ng-template #loadingState>
+    <p class="loading-text">Loading partners…</p>
+  </ng-template>
+</section>

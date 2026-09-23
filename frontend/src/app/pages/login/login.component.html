@@ -1,0 +1,141 @@
+<div class="login-screen">
+  <aside class="login-aside">
+    <div class="aside-inner">
+      <div class="brand-row">
+        <span class="brand-mark">N</span>
+        <span class="brand-name">Nexbridge</span>
+      </div>
+
+      <h2>Every partner. Every integration. One control tower.</h2>
+      <p class="aside-copy">
+        Onboard partners, monitor connected endpoints and watch webhook traffic
+        arrive in real time.
+      </p>
+
+      <ul class="aside-points">
+        <li>Live activity feed for every webhook event</li>
+        <li>Partner onboarding and status control</li>
+        <li>REST, GraphQL, Webhook, File sync and EDI endpoints</li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="login-main">
+    <div class="login-card">
+      <h1>Welcome back</h1>
+      <p class="subhead">Sign in to your integration control tower.</p>
+
+      <form (ngSubmit)="submit()" #form="ngForm" novalidate>
+        <div class="field" [class.has-error]="emailError()">
+          <label for="email">Work email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            [ngModel]="email"
+            (ngModelChange)="onEmailChange($event)"
+            required
+            autocomplete="email"
+            placeholder="you@company.com"
+            [attr.aria-invalid]="emailError() ? 'true' : null"
+            [attr.aria-describedby]="emailError() ? 'email-error' : null"
+          />
+          <p
+            class="field-error"
+            id="email-error"
+            role="alert"
+            *ngIf="emailError() as msg"
+          >
+            {{ msg }}
+          </p>
+        </div>
+
+        <div class="field" [class.has-error]="passwordError()">
+          <label for="password">Password</label>
+          <div class="password-wrap">
+            <input
+              id="password"
+              name="password"
+              [type]="showPassword() ? 'text' : 'password'"
+              [ngModel]="password"
+              (ngModelChange)="onPasswordChange($event)"
+              required
+              autocomplete="current-password"
+              placeholder="Your password"
+              [attr.aria-invalid]="passwordError() ? 'true' : null"
+              [attr.aria-describedby]="
+                passwordError() ? 'password-error' : null
+              "
+            />
+            <button
+              type="button"
+              class="pw-toggle"
+              (click)="togglePassword()"
+              [attr.aria-label]="
+                showPassword() ? 'Hide password' : 'Show password'
+              "
+              [attr.aria-pressed]="showPassword()"
+            >
+              <svg
+                *ngIf="!showPassword()"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg
+                *ngIf="showPassword()"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M17.94 17.94A10.4 10.4 0 0 1 12 19c-6.4 0-10-7-10-7a17.7 17.7 0 0 1 4.06-4.94"
+                />
+                <path
+                  d="M9.9 4.24A9.9 9.9 0 0 1 12 4c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.16 3.19"
+                />
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                <path d="M1 1l22 22" />
+              </svg>
+            </button>
+          </div>
+          <p
+            class="field-error"
+            id="password-error"
+            role="alert"
+            *ngIf="passwordError() as msg"
+          >
+            {{ msg }}
+          </p>
+        </div>
+
+        <p class="error" role="alert" *ngIf="formError() as msg">{{ msg }}</p>
+
+        <button
+          type="submit"
+          class="btn btn-primary full-width"
+          [disabled]="loading() || form.invalid"
+        >
+          {{ loading() ? "Signing in…" : "Sign in" }}
+        </button>
+      </form>
+
+      <p class="hint">
+        No account yet? Register one through the <code>register</code> GraphQL
+        mutation documented in the README — the first account should use the
+        Admin role.
+      </p>
+    </div>
+  </main>
+</div>

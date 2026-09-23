@@ -1,0 +1,86 @@
+<ng-container *ngIf="auth.isAuthenticated; else bare">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">N</span>
+        <span class="brand-name">Nexbridge</span>
+      </div>
+
+      <nav class="nav-links">
+        <a routerLink="/dashboard" routerLinkActive="active">
+          <svg
+            class="nav-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg>
+          <span class="nav-text">Overview</span>
+        </a>
+        <a routerLink="/partners" routerLinkActive="active">
+          <svg
+            class="nav-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16" />
+            <path d="M14 9h5a1 1 0 0 1 1 1v11" />
+            <path d="M8 8h2M8 12h2M8 16h2" />
+            <path d="M3 21h18" />
+          </svg>
+          <span class="nav-text">Partners</span>
+        </a>
+        <a routerLink="/integrations" routerLinkActive="active">
+          <svg
+            class="nav-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path
+              d="M10 13a5 5 0 0 0 7.07 0l2.5-2.5a5 5 0 0 0-7.07-7.07L11 4.93"
+            />
+            <path
+              d="M14 11a5 5 0 0 0-7.07 0l-2.5 2.5a5 5 0 0 0 7.07 7.07L13 19.07"
+            />
+          </svg>
+          <span class="nav-text">Integrations</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="status-dot live"></span> All systems live
+      </div>
+    </aside>
+
+    <div class="main-column">
+      <app-navbar></app-navbar>
+      <main class="content">
+        <router-outlet></router-outlet>
+      </main>
+    </div>
+  </div>
+</ng-container>
+
+<ng-template #bare>
+  <router-outlet></router-outlet>
+</ng-template>
+
+<app-confirm-modal></app-confirm-modal>

@@ -1,0 +1,133 @@
+.topbar {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 44px;
+  border-bottom: 1px solid var(--border-line);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gold-500);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.mobile-brand {
+  display: none;
+}
+
+.user-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
+}
+
+.user-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--green-900);
+}
+.user-role {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, var(--green-700), var(--green-900));
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 3px var(--gold-400);
+}
+
+.signout {
+  min-height: 38px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+}
+
+@media (max-width: 960px) {
+  .topbar {
+    position: static;
+    padding: 0 24px;
+    height: 64px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    position: sticky;
+    top: 0;
+    padding: 0 16px;
+    height: 60px;
+  }
+  .eyebrow,
+  .user-meta {
+    display: none;
+  }
+
+  .mobile-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 19px;
+    color: var(--green-900);
+  }
+  .mb-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, var(--green-700), var(--green-900));
+    color: #fff;
+    font-size: 16px;
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0 0 3px var(--gold-400);
+  }
+
+  .user-block {
+    gap: 10px;
+  }
+  .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+  .signout {
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 36px;
+  }
+}

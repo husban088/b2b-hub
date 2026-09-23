@@ -1,0 +1,129 @@
+<div class="page-head row">
+  <div>
+    <h1>Integrations</h1>
+    <p class="lede">Every connected endpoint, across every partner.</p>
+  </div>
+  <button class="btn btn-primary" (click)="toggleForm()">
+    {{ showForm() ? "Cancel" : "+ New integration" }}
+  </button>
+</div>
+
+<section class="panel form-panel" *ngIf="showForm()">
+  <form (ngSubmit)="createIntegration()" #f="ngForm">
+    <div class="form-grid">
+      <div class="field">
+        <label for="partnerId">Partner</label>
+        <select
+          id="partnerId"
+          name="partnerId"
+          [(ngModel)]="form.partnerId"
+          required
+        >
+          <option value="" disabled>Select a partner</option>
+          <option *ngFor="let p of partners()" [value]="p.id">
+            {{ p.companyName }}
+          </option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="name">Integration name</label>
+        <input
+          id="name"
+          name="name"
+          [(ngModel)]="form.name"
+          required
+          placeholder="e.g. Order sync"
+        />
+      </div>
+      <div class="field">
+        <label for="type">Type</label>
+        <select id="type" name="type" [(ngModel)]="form.type" required>
+          <option *ngFor="let t of types" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="endpointUrl">Endpoint URL</label>
+        <input
+          id="endpointUrl"
+          name="endpointUrl"
+          [(ngModel)]="form.endpointUrl"
+          required
+          placeholder="https://partner.example.com/api"
+        />
+      </div>
+      <div class="field span-2">
+        <label for="scopes">Scopes (comma separated)</label>
+        <input
+          id="scopes"
+          name="scopes"
+          [(ngModel)]="form.scopesRaw"
+          placeholder="orders:read, invoices:write"
+        />
+      </div>
+    </div>
+    <button
+      type="submit"
+      class="btn btn-primary"
+      [disabled]="saving() || f.invalid"
+    >
+      {{ saving() ? "Saving…" : "Create integration" }}
+    </button>
+  </form>
+</section>
+
+<section class="panel table-panel">
+  <table class="data-table" *ngIf="!loading(); else loadingState">
+    <thead>
+      <tr>
+        <th>Integration</th>
+        <th>Partner</th>
+        <th>Type</th>
+        <th>Endpoint</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let integration of integrations()">
+        <td data-label="Integration" class="name-cell">
+          {{ integration.name }}
+        </td>
+        <td data-label="Partner">{{ partnerName(integration.partnerId) }}</td>
+        <td data-label="Type">
+          <span class="type-pill">{{ integration.type }}</span>
+        </td>
+        <td data-label="Endpoint" class="endpoint-cell">
+          {{ integration.endpointUrl }}
+        </td>
+        <td data-label="Status">
+          <div class="status-cell">
+            <span
+              class="status-dot"
+              [ngClass]="statusClass(integration.status)"
+            ></span>
+            <select
+              [ngModel]="integration.status"
+              (ngModelChange)="changeStatus(integration, $event)"
+            >
+              <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+            </select>
+          </div>
+        </td>
+        <td class="actions-cell">
+          <button class="btn btn-danger" (click)="remove(integration)">
+            Delete
+          </button>
+        </td>
+      </tr>
+      <tr *ngIf="integrations().length === 0">
+        <td colspan="6" class="empty-row">
+          No integrations yet — connect your first partner endpoint above.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <ng-template #loadingState>
+    <p class="loading-text">Loading integrations…</p>
+  </ng-template>
+</section>

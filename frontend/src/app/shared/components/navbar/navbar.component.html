@@ -1,0 +1,20 @@
+<header class="topbar">
+  <div class="page-context">
+    <span class="mobile-brand">
+      <span class="mb-mark">N</span>
+      <span class="mb-name">Nexbridge</span>
+    </span>
+    <span class="eyebrow">Control tower</span>
+  </div>
+
+  <div class="user-block" *ngIf="auth.currentUser() as user">
+    <div class="user-meta">
+      <span class="user-name">{{ user.fullName }}</span>
+      <span class="user-role">{{ user.role }}</span>
+    </div>
+    <span class="avatar" aria-hidden="true">{{
+      user.fullName.charAt(0) | uppercase
+    }}</span>
+    <button class="btn signout" (click)="signOut()">Sign out</button>
+  </div>
+</header>
