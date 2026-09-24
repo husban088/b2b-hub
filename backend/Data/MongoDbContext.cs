@@ -14,7 +14,11 @@ public class MongoDbContext
 
     public MongoDbContext(IOptions<MongoDbSettings> settings)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
+        var mongoSettings = MongoClientSettings.FromConnectionString(settings.Value.ConnectionString);
+        // Fail fast (10s instead of the 30s default) so a bad connection string / blocked IP
+        // shows up as a quick error instead of a hanging request.
+        mongoSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(10);
+        var client = new MongoClient(mongoSettings);
         _database = client.GetDatabase(settings.Value.DatabaseName);
     }
 
