@@ -2,11 +2,13 @@
 // Writes src/environments/environment.prod.ts from Vercel environment variables:
 //   GRAPHQL_HTTP_URL  e.g. https://your-backend.onrender.com/graphql   (required)
 //   GRAPHQL_WS_URL    e.g. wss://your-backend.onrender.com/graphql     (optional - derived from HTTP url if missing)
+//   API_BASE_URL      e.g. https://your-backend.onrender.com           (optional - derived from GRAPHQL_HTTP_URL if missing)
 const fs = require("fs");
 const path = require("path");
 
 const http = (process.env.GRAPHQL_HTTP_URL || "").trim();
 let ws = (process.env.GRAPHQL_WS_URL || "").trim();
+let apiBase = (process.env.API_BASE_URL || "").trim();
 
 if (!http) {
   console.warn(
@@ -19,11 +21,15 @@ if (!http) {
 // https://x -> wss://x , http://x -> ws://x
 if (!ws) ws = http.replace(/^http/i, "ws");
 
+// https://x/graphql -> https://x  (strip a trailing /graphql if present)
+if (!apiBase) apiBase = http.replace(/\/graphql\/?$/i, "");
+
 const content =
   `export const environment = {\n` +
   `  production: true,\n` +
   `  graphqlHttpUrl: ${JSON.stringify(http)},\n` +
-  `  graphqlWsUrl: ${JSON.stringify(ws)}\n` +
+  `  graphqlWsUrl: ${JSON.stringify(ws)},\n` +
+  `  apiBaseUrl: ${JSON.stringify(apiBase)}\n` +
   `};\n`;
 
 const target = path.join(
@@ -37,3 +43,4 @@ fs.writeFileSync(target, content);
 console.log("[set-env] environment.prod.ts written");
 console.log("[set-env]   http:", http);
 console.log("[set-env]   ws  :", ws);
+console.log("[set-env]   api :", apiBase);
