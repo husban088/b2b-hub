@@ -13,12 +13,17 @@ public enum PartnerStatus
 
 /// <summary>
 /// A business partner (client company) connected to the integration hub.
+/// Belongs to exactly one Company (tenant) - BMW's clients are never visible to Audi.
 /// </summary>
 public class Partner
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+    /// <summary>The tenant (Company) this client belongs to.</summary>
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string CompanyId { get; set; } = string.Empty;
 
     public string CompanyName { get; set; } = string.Empty;
     public string CompanyEmail { get; set; } = string.Empty;

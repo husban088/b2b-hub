@@ -8,17 +8,105 @@ real-time activity feed of webhook traffic, and role-based staff logins.
 - **Frontend:** Angular 17 (standalone components) + TypeScript, Apollo GraphQL client (queries, mutations, and live subscriptions), responsive dark "control-tower" UI
 - **Backend:** ASP.NET Core 8 (C# / .NET) + HotChocolate GraphQL server, JWT auth
 - **Database:** MongoDB
+- **Event bus:** Apache Kafka (KRaft, single node) — every webhook event is published to `webhook.events.v1` so other services can react independently of the Angular dashboard
 - **Images:** Cloudinary (partner logos / uploaded assets)
 - **Infra:** Docker + Docker Compose for local dev, AWS (ECS Fargate, ECR, Secrets Manager, S3) for production — see `aws/DEPLOY.md`
 
 ```
 b2b-hub/
-├── backend/            ASP.NET Core + GraphQL API
-├── frontend/            Angular app
-├── aws/                 ECS task definition + deployment guide
-├── docker-compose.yml    Full local stack (Mongo + backend + frontend)
+├── backend/              ASP.NET Core + GraphQL API + Kafka producer
+├── frontend/             Angular app
+├── services/             Kafka consumer services (Java/Kotlin/Python — see roadmap below)
+├── aws/                  ECS task definition + deployment guide
+├── docker-compose.yml    Full local stack (Mongo + Kafka + Kafka UI + backend + frontend)
 └── .env.example          Copy to .env and fill in your keys
 ```
+
+### Event streaming (Kafka)
+
+Every webhook event that lands via `POST /api/webhooks/{integrationId}` is now published
+to the Kafka topic **`webhook.events.v1`** (see `backend/Messaging/`), in addition to going
+into Mongo and out over the existing GraphQL subscription. Kafka is best-effort: if it's
+unreachable, the webhook still succeeds and the dashboard still updates — Kafka is an extra
+stream for other services, not the primary path.
+
+- **Bootstrap servers (in Docker):** `kafka:19092` (internal), exposed to your host machine as `localhost:9092`
+- **Browse topics/messages:** http://localhost:8090 (Kafka UI, included in docker-compose)
+- **Message contract:** `backend/Messaging/WebhookEventMessage.cs` — `eventId`, `integrationId`, `direction`, `eventType`, `statusCode`, `success`, `payload`, `errorMessage`, `receivedAt`
+
+**Verify it end-to-end:**
+```bash
+docker compose up --build          # kafka + kafka-ui now start alongside mongo/backend/frontend
+cd services/kafka-smoke-test-consumer
+pip install -r requirements.txt
+python consumer.py                 # leave this running
+```
+Then in another terminal, POST a test webhook (use a real integration id from the app):
+```bash
+curl -X POST http://localhost:8080/api/webhooks/<integrationId> \
+     -H "Content-Type: application/json" \
+     -d '{"eventType": "order.created", "payload": {"orderId": 123}}'
+```
+You should see the event printed by `consumer.py` within a second or two.
+
+### Polyglot consumer services
+
+The Kafka event bus above is the foundation everything else plugs into. Each service
+below lives under `services/` and consumes `webhook.events.v1` independently — none of
+them touch the .NET backend directly, they all read from Kafka (and Mongo, read-only).
+
+| Service | Language | Job | Status |
+|---|---|---|---|
+| EDI Processor | Java (Spring Boot) | Consumes events for EDI integrations, parses X12 (ISA/GS/ST/SE/GE/IEA) payloads, stores results in `edi_processed_events` | ✅ Built |
+| Notification/Retry Service | Kotlin (Ktor) | Retries failed outbound webhooks with backoff, raises an alert in `integration_alerts` after N consecutive failures | ✅ Built (`services/notification-service`, port 8082) |
+| Analytics Service | Python (FastAPI) | Aggregates traffic stats (volume, success rate) per integration and as a daily time series; REST API for the dashboard | ✅ Built (`services/analytics-service`, port 8083) |
+
+#### Testing the Notification/Retry Service
+
+```bash
+docker compose up --build     # also builds/starts notification-service on port 8082
+curl http://localhost:8082/health
+```
+Send a few failing outbound events through the same webhook endpoint (`success: false`) for one
+integration; after 3 in a row (`NOTIFICATION_ALERT_THRESHOLD`) a doc appears in Mongo's
+`integration_alerts` collection and the service retries delivery to that integration's
+`endpointUrl` with backoff (2s, 4s, 8s) before giving up.
+
+#### Testing the Analytics Service
+
+```bash
+docker compose up --build     # also builds/starts analytics-service on port 8083
+curl http://localhost:8083/analytics/overview
+curl http://localhost:8083/analytics/timeseries?days=7
+```
+Every event on `webhook.events.v1` is aggregated into `integration_analytics` (running totals)
+and `integration_analytics_daily` (per-day rollup) as it arrives.
+
+`services/kafka-smoke-test-consumer/` is a throwaway verification script, not the real
+analytics service — it'll be replaced once that's built.
+
+#### Testing the EDI Processor
+
+```bash
+docker compose up --build     # also builds/starts edi-processor on port 8081
+```
+
+1. In the app, create (or reuse) an Integration with type **EDI** on some Partner, and
+   copy its id.
+2. Send it a valid X12 payload through the same REST webhook endpoint partners use:
+   ```bash
+   curl -X POST http://localhost:8080/api/webhooks/<ediIntegrationId> \
+        -H "Content-Type: application/json" \
+        -d '{"eventType": "850.received", "payload": "ISA*00*          *00*          *ZZ*SENDERID       *ZZ*RECEIVERID     *260927*1200*U*00401*000000905*0*T*:~GS*PO*SENDERID*RECEIVERID*20260927*1200*1*X*004010~ST*850*0001~BEG*00*NE*PO0001**20260927~SE*3*0001~GE*1*1~IEA*1*000000905~"}'
+   ```
+3. Check the parsed result:
+   ```bash
+   docker exec -it b2b-hub-mongo mongosh b2b_integration_hub --eval "db.edi_processed_events.find().pretty()"
+   ```
+   You should see one document with `parseSuccess: true` and the ISA/GS/ST fields filled in.
+4. Sending the same event again is a no-op (idempotent on `eventId`). Sending an event for
+   a non-EDI integration is silently ignored — nothing is written to `edi_processed_events`,
+   by design. Tail `docker compose logs -f edi-processor` to watch it consume in real time.
 
 ---
 
@@ -61,26 +149,15 @@ To stop everything: `docker compose down` (add `-v` to also wipe the Mongo volum
 
 ## 3. Create your first login
 
-The dashboard requires a logged-in user. Register one through GraphQL —
-open **http://localhost:8080/graphql** (Banana Cake Pop / GraphQL IDE ships
-with HotChocolate) and run:
+Open **http://localhost:4200/signup**, fill in the form (Admin role gives you
+full access), and you're immediately logged in and dropped onto the dashboard
+— no GraphQL Playground needed. `/login` and `/signup` are both plain pages
+in the Angular app; behind the scenes they call the `login`/`register`
+GraphQL mutations and store the returned JWT for you.
 
-```graphql
-mutation {
-  register(input: {
-    fullName: "Your Name"
-    email: "you@example.com"
-    password: "a-strong-password"
-    role: ADMIN
-  }) {
-    id
-    email
-  }
-}
-```
-
-Then open **http://localhost:4200**, sign in with that email/password, and
-you'll land on the live dashboard.
+(The `register`/`login` mutations are still reachable directly at
+**http://localhost:8080/graphql** if you ever need to script account
+creation, but the app itself never requires you to open that page.)
 
 ---
 
@@ -127,7 +204,7 @@ sudo apt install -y mongodb
 - **Integrations page** — connect REST/GraphQL/Webhook/File-sync/EDI endpoints per partner, manage status, auto-generated API key reference
 - **Dashboard** — network-status summary tiles plus a **live activity feed** that streams in over a GraphQL subscription (WebSocket) the instant a webhook event is recorded
 - **REST webhook receiver** (`POST /api/webhooks/{integrationId}`) — so a partner's existing webhook sender can push events in without needing a GraphQL client; each accepted event flows straight into the live feed
-- **JWT auth** with role-based accounts (Admin / Operator / Viewer)
+- **JWT auth** with role-based accounts (Admin / Operator / Viewer) — sign up and sign in through `/signup` and `/login`, no GraphQL client needed
 - **Responsive UI** — sidebar collapses to a top bar on mobile/tablet, all tables scroll horizontally on small screens, forms stack to a single column
 
 ---

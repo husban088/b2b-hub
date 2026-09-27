@@ -1,4 +1,5 @@
 using HotChocolate;
+using HotChocolate.Authorization;
 using HotChocolate.Types;
 using B2BIntegrationHub.Models;
 using B2BIntegrationHub.Services;
@@ -8,24 +9,37 @@ namespace B2BIntegrationHub.GraphQL;
 public record CreatePartnerInput(string CompanyName, string CompanyEmail, string Country, string Industry);
 public record UpdatePartnerInput(string Id, string CompanyName, string Country, string Industry, PartnerStatus Status);
 public record CreateIntegrationInput(string PartnerId, string Name, IntegrationType Type, string EndpointUrl, string[] Scopes);
+
+// RegisterInput now signs up a whole Company (tenant), not just one user - CompanyName/VatNumber/Iban
+// are required on every German invoice, so we collect them right at signup.
 public record RegisterInput(string FullName, string Email, string Password, string CompanyName, string VatNumber, string Iban);
 public record LoginInput(string Email, string Password);
 public record RecordWebhookEventInput(string IntegrationId, string Direction, string EventType, int StatusCode, bool Success, string? Payload, string? ErrorMessage);
+public record CreateInvoiceInput(string PartnerId, string Description, decimal Amount);
 
 public class Mutation
 {
-    public Task<Partner> CreatePartner(CreatePartnerInput input, [Service] IPartnerService service) =>
-        service.CreateAsync(new Partner
+    [Authorize]
+    public async Task<Partner> CreatePartner(
+        CreatePartnerInput input, [Service] IPartnerService service, [Service] ICurrentUserService currentUser)
+    {
+        var companyId = RequireCompanyId(currentUser);
+        return await service.CreateAsync(new Partner
         {
+            CompanyId = companyId,
             CompanyName = input.CompanyName,
             CompanyEmail = input.CompanyEmail.ToLowerInvariant(),
             Country = input.Country,
             Industry = input.Industry
         });
+    }
 
-    public async Task<Partner?> UpdatePartner(UpdatePartnerInput input, [Service] IPartnerService service)
+    [Authorize]
+    public async Task<Partner?> UpdatePartner(
+        UpdatePartnerInput input, [Service] IPartnerService service, [Service] ICurrentUserService currentUser)
     {
-        var existing = await service.GetByIdAsync(input.Id);
+        var companyId = RequireCompanyId(currentUser);
+        var existing = await service.GetByIdAsync(input.Id, companyId);
         if (existing is null) return null;
 
         existing.CompanyName = input.CompanyName;
@@ -33,20 +47,24 @@ public class Mutation
         existing.Industry = input.Industry;
         existing.Status = input.Status;
 
-        return await service.UpdateAsync(input.Id, existing);
+        return await service.UpdateAsync(input.Id, companyId, existing);
     }
 
-    public Task<bool> DeletePartner(string id, [Service] IPartnerService service) =>
-        service.DeleteAsync(id);
+    [Authorize]
+    public Task<bool> DeletePartner(string id, [Service] IPartnerService service, [Service] ICurrentUserService currentUser) =>
+        service.DeleteAsync(id, RequireCompanyId(currentUser));
 
     /// <summary>Attaches an uploaded logo (via Cloudinary) to a partner.</summary>
+    [Authorize]
     public async Task<Partner?> UploadPartnerLogo(
         string partnerId,
         IFile file,
         [Service] IPartnerService partners,
-        [Service] ICloudinaryService cloudinary)
+        [Service] ICloudinaryService cloudinary,
+        [Service] ICurrentUserService currentUser)
     {
-        var partner = await partners.GetByIdAsync(partnerId);
+        var companyId = RequireCompanyId(currentUser);
+        var partner = await partners.GetByIdAsync(partnerId, companyId);
         if (partner is null) return null;
 
         await using var stream = file.OpenReadStream();
@@ -55,7 +73,7 @@ public class Mutation
         partner.LogoUrl = url;
         partner.LogoPublicId = publicId;
 
-        return await partners.UpdateAsync(partnerId, partner);
+        return await partners.UpdateAsync(partnerId, companyId, partner);
     }
 
     public Task<Integration> CreateIntegration(CreateIntegrationInput input, [Service] IIntegrationService service) =>
@@ -87,6 +105,7 @@ public class Mutation
             ErrorMessage = input.ErrorMessage
         });
 
+    /// <summary>Signs up a brand new company (tenant) plus its first user, who becomes Admin.</summary>
     public async Task<AuthPayload> Register(RegisterInput input, [Service] IAuthService auth)
     {
         try
@@ -94,7 +113,7 @@ public class Mutation
             var result = await auth.RegisterAsync(
                 input.FullName, input.Email, input.Password,
                 input.CompanyName, input.VatNumber, input.Iban);
-            return new AuthPayload(result.Token, result.User);
+            return new AuthPayload(result.Token, result.User, result.Company);
         }
         catch (InvalidOperationException ex)
         {
@@ -112,7 +131,7 @@ public class Mutation
             {
                 throw new GraphQLException("Invalid email or password.");
             }
-            return new AuthPayload(result.Token, result.User);
+            return new AuthPayload(result.Token, result.User, result.Company);
         }
         catch (LoginFailedException ex)
         {
@@ -120,6 +139,22 @@ public class Mutation
             throw new GraphQLException(ErrorBuilder.New().SetMessage(ex.Message).SetCode(ex.Code).Build());
         }
     }
+
+    /// <summary>Creates the invoice, calculates 19% VAT and generates the Stripe "Pay Now" link.</summary>
+    [Authorize]
+    public async Task<Invoice> CreateInvoice(
+        CreateInvoiceInput input, [Service] IInvoiceService service, [Service] ICurrentUserService currentUser)
+    {
+        var companyId = RequireCompanyId(currentUser);
+        return await service.CreateAsync(companyId, input.PartnerId, input.Description, input.Amount);
+    }
+
+    [Authorize]
+    public Task<bool> DeleteInvoice(string id, [Service] IInvoiceService service, [Service] ICurrentUserService currentUser) =>
+        service.DeleteAsync(id, RequireCompanyId(currentUser));
+
+    private static string RequireCompanyId(ICurrentUserService currentUser) =>
+        currentUser.CompanyId ?? throw new GraphQLException("Not logged into a company.");
 }
 
-public record AuthPayload(string Token, AppUser User);
+public record AuthPayload(string Token, AppUser User, Company Company);

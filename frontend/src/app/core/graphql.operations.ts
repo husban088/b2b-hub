@@ -10,6 +10,12 @@ export const LOGIN = gql`
         email
         role
       }
+      company {
+        id
+        name
+        vatNumber
+        iban
+      }
     }
   }
 `;
@@ -23,6 +29,12 @@ export const REGISTER = gql`
         fullName
         email
         role
+      }
+      company {
+        id
+        name
+        vatNumber
+        iban
       }
     }
   }
@@ -169,6 +181,69 @@ export const ON_WEBHOOK_EVENT = gql`
       payload
       errorMessage
       receivedAt
+    }
+  }
+`;
+
+export const GET_INVOICES = gql`
+  query Invoices {
+    invoices {
+      id
+      partnerId
+      invoiceNumber
+      description
+      amount
+      vatAmount
+      totalAmount
+      currency
+      status
+      stripePaymentLinkUrl
+      paidAt
+      createdAt
+    }
+  }
+`;
+
+export const CREATE_INVOICE = gql`
+  mutation CreateInvoice($input: CreateInvoiceInput!) {
+    createInvoice(input: $input) {
+      id
+      partnerId
+      invoiceNumber
+      description
+      amount
+      vatAmount
+      totalAmount
+      currency
+      status
+      stripePaymentLinkUrl
+      paidAt
+      createdAt
+    }
+  }
+`;
+
+export const DELETE_INVOICE = gql`
+  mutation DeleteInvoice($id: String!) {
+    deleteInvoice(id: $id)
+  }
+`;
+
+export const ON_INVOICE_PAID = gql`
+  subscription OnInvoicePaid {
+    onInvoicePaid {
+      id
+      partnerId
+      invoiceNumber
+      description
+      amount
+      vatAmount
+      totalAmount
+      currency
+      status
+      stripePaymentLinkUrl
+      paidAt
+      createdAt
     }
   }
 `;

@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using B2BIntegrationHub.Data;
 using B2BIntegrationHub.GraphQL;
+using B2BIntegrationHub.Messaging;
 using B2BIntegrationHub.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,14 +18,27 @@ builder.Host.UseSerilog((ctx, cfg) => cfg
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDb"));
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<KafkaSettings>(builder.Configuration.GetSection("Kafka"));
+builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection("Stripe"));
 
 // ---------- Data + Services (DI) ----------
 builder.Services.AddSingleton<MongoDbContext>();
+// Singleton: the underlying Kafka producer/connection is thread-safe and expensive
+// to open, so it's built once and shared across every request.
+builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
 builder.Services.AddScoped<IPartnerService, PartnerService>();
 builder.Services.AddScoped<IIntegrationService, IntegrationService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICompanyService, CompanyService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddSingleton<IStripeService, StripeService>();
+builder.Services.AddSingleton<IInvoicePdfService, InvoicePdfService>();
+
+// Lets any service read the logged-in user's claims (companyId, etc.) off the current request.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // ---------- AWS (S3 client available via DI for large file / backup storage) ----------
 builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
@@ -72,6 +86,7 @@ builder.Services.AddCors(options =>
 // ---------- GraphQL (HotChocolate) ----------
 builder.Services
     .AddGraphQLServer()
+    .AddAuthorization() // REQUIRED for [Authorize] on Query/Mutation fields (multi-tenant login checks)
     .AddQueryType<Query>()
     .AddMutationType<Mutation>()
     .AddSubscriptionType<Subscription>()

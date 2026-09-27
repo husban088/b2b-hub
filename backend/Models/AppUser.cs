@@ -20,7 +20,8 @@ public class AppUser
     [BsonRepresentation(BsonType.ObjectId)]
     public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
-    /// <summary>The tenant (Company) this user belongs to — read from the JWT on every request.</summary>
+    /// <summary>Which company (tenant) this user belongs to. Every user belongs to exactly one company.</summary>
+    [BsonRepresentation(BsonType.ObjectId)]
     public string CompanyId { get; set; } = string.Empty;
 
     public string FullName { get; set; } = string.Empty;

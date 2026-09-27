@@ -15,6 +15,121 @@ services:
       timeout: 5s
       retries: 5
 
+  # Single-node Kafka broker in KRaft mode (no Zookeeper needed). This is the event
+  # bus every downstream service (backend producer, future Java EDI processor, Kotlin
+  # notification service, Python analytics service) connects to.
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: b2b-hub-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092" # host access, e.g. for the Python smoke-test consumer run outside Docker
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Internal listener (19092) is what other containers use; PLAINTEXT_HOST (9092) is
+      # what your host machine (outside Docker) uses to connect.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092,CONTROLLER://0.0.0.0:19093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:19093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: b2b-hub-kafka-cluster-1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # Optional but very useful while developing: browse topics/messages at http://localhost:8090
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: b2b-hub-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: nexbridge
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Java EDI Processor: consumes webhook.events.v1, and for events whose integration
+  # is type EDI, parses the payload as X12 (ISA/GS/ST/SE/GE/IEA) and stores the result
+  # in edi_processed_events. Every other event is left alone (not stored, by design).
+  edi-processor:
+    build:
+      context: ./services/edi-processor
+      dockerfile: Dockerfile
+    container_name: b2b-hub-edi-processor
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      MONGODB_URI: mongodb://mongodb:27017/b2b_integration_hub
+      EDI_KAFKA_TOPIC: webhook.events.v1
+      EDI_CONSUMER_GROUP: edi-processor
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # Kotlin Notification/Retry Service: consumes webhook.events.v1, retries failed outbound
+  # webhook deliveries with exponential backoff, and raises an alert (integration_alerts
+  # collection) after NOTIFICATION_ALERT_THRESHOLD consecutive failures for an integration.
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: b2b-hub-notification-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      MONGODB_URI: mongodb://mongodb:27017/b2b_integration_hub
+      NOTIFICATION_KAFKA_TOPIC: webhook.events.v1
+      NOTIFICATION_CONSUMER_GROUP: notification-service
+      NOTIFICATION_ALERT_THRESHOLD: "3"
+      NOTIFICATION_MAX_RETRY_ATTEMPTS: "3"
+      NOTIFICATION_RETRY_BACKOFF_MS: "2000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # Python Analytics Service (FastAPI): consumes webhook.events.v1 in the background,
+  # aggregates traffic stats into Mongo, and exposes them over a small REST API for the
+  # Angular dashboard.
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    container_name: b2b-hub-analytics-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: b2b_integration_hub
+      ANALYTICS_KAFKA_TOPIC: webhook.events.v1
+      ANALYTICS_CONSUMER_GROUP: analytics-service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
   backend:
     build:
       context: ./backend
@@ -27,6 +142,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       MongoDb__ConnectionString: mongodb://mongodb:27017
       MongoDb__DatabaseName: b2b_integration_hub
+      Kafka__BootstrapServers: kafka:19092
       # Cloudinary keys are only needed for logo upload - safe to leave empty while testing.
       Cloudinary__CloudName: ${CLOUDINARY_CLOUD_NAME:-}
       Cloudinary__ApiKey: ${CLOUDINARY_API_KEY:-}
@@ -38,6 +154,8 @@ services:
       Cors__AllowedOrigins__1: http://localhost
     depends_on:
       mongodb:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   frontend:
@@ -56,3 +174,4 @@ services:
 
 volumes:
   mongo_data:
+  kafka_data:

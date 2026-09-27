@@ -1,16 +1,29 @@
 <#
   Nexbridge - demo data seeder (fake data only)
 
-  Creates two fake partners (Pantrix, Nexora), their integrations, a few
-  webhook events for the live activity feed, and sets varied statuses.
-  Safe to run more than once: existing partners/integrations are reused.
+  Logs in (or registers) a demo company, then creates five fake partners
+  (Pantrix, Nexora, BrightForge, Solvara, Kestrel Freight) with their
+  integrations, a batch of fake invoices per partner, and a few webhook
+  events for the live activity feed. Safe to run more than once: existing
+  partners/integrations are reused, and invoices are only created if that
+  partner doesn't already have any.
 
   Usage (backend must be running):
     powershell -ExecutionPolicy Bypass -File .\scripts\seed-demo-data.ps1
     powershell -ExecutionPolicy Bypass -File .\scripts\seed-demo-data.ps1 -ApiBase "https://your-backend.onrender.com"
+
+  First run with no existing account: pass -Email/-Password/-CompanyName (or
+  edit the defaults below) and the script will register that company for you.
+  On later runs it just logs in with the same credentials.
 #>
 param(
-  [string]$ApiBase = "http://localhost:8080"
+  [string]$ApiBase     = "http://localhost:8080",
+  [string]$Email       = "demo@nexbridge.example.com",
+  [string]$Password    = "DemoPass123!",
+  [string]$FullName    = "Demo Admin",
+  [string]$CompanyName = "Nexbridge Demo GmbH",
+  [string]$VatNumber   = "DE123456789",
+  [string]$Iban        = "DE89370400440532013000"
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,16 +31,64 @@ $ErrorActionPreference = "Stop"
 
 $ApiBase = $ApiBase.TrimEnd('/')
 $GraphQlUrl = "$ApiBase/graphql"
+$script:AuthToken = $null
+$EmailTag = (($Email -split "@")[0] -replace "[^a-zA-Z0-9]", "").ToLower()
+if ([string]::IsNullOrWhiteSpace($EmailTag)) { $EmailTag = "demo" }
 
 function Invoke-Gql {
   param([string]$Query, [hashtable]$Variables = @{})
   $body = ConvertTo-Json -InputObject @{ query = $Query; variables = $Variables } -Depth 10 -Compress
-  $res = Invoke-RestMethod -Method Post -Uri $GraphQlUrl -ContentType "application/json" -Body $body
+  $headers = @{}
+  if ($script:AuthToken) { $headers["Authorization"] = "Bearer $script:AuthToken" }
+  try {
+    $res = Invoke-RestMethod -Method Post -Uri $GraphQlUrl -ContentType "application/json" -Body $body -Headers $headers
+  }
+  catch {
+    # Surface the real GraphQL/HTTP error body instead of a bare "400 Bad Request".
+    $raw = $null
+    if ($_.Exception.Response) {
+      try {
+        $stream = $_.Exception.Response.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($stream)
+        $raw = $reader.ReadToEnd()
+      } catch {}
+    }
+    if ($raw) { throw "$($_.Exception.Message) - Response body: $raw" }
+    else { throw }
+  }
   if ($res.errors) {
     $msg = ($res.errors | ForEach-Object { $_.message }) -join "; "
     throw $msg
   }
   return $res.data
+}
+
+function Ensure-LoggedIn {
+  Write-Host "Authenticating as $Email ..."
+  try {
+    $data = Invoke-Gql 'mutation($input: LoginInput!) { login(input: $input) { token company { id name } } }' @{
+      input = @{ email = $Email; password = $Password }
+    }
+    $script:AuthToken = $data.login.token
+    Write-Host "  Logged in to $($data.login.company.name)"
+    return
+  }
+  catch {
+    Write-Host "  Login failed ($($_.Exception.Message)) - trying to register instead ..."
+  }
+
+  $data = Invoke-Gql 'mutation($input: RegisterInput!) { register(input: $input) { token company { id name } } }' @{
+    input = @{
+      fullName    = $FullName
+      email       = $Email
+      password    = $Password
+      companyName = $CompanyName
+      vatNumber   = $VatNumber
+      iban        = $Iban
+    }
+  }
+  $script:AuthToken = $data.register.token
+  Write-Host "  Registered and logged in to $($data.register.company.name)"
 }
 
 function Ensure-Partner {
@@ -104,14 +165,44 @@ function Set-IntegrationStatus {
   } | Out-Null
 }
 
+function Ensure-Invoices {
+  param([string]$PartnerId, [string]$PartnerLabel, [array]$Invoices)
+
+  $data = Invoke-Gql 'query { invoices { id partnerId } }'
+  $existingCount = ($data.invoices | Where-Object { $_.partnerId -eq $PartnerId }).Count
+
+  if ($existingCount -gt 0) {
+    Write-Host "    Invoices exist for $PartnerLabel ($existingCount) - skipping"
+    return
+  }
+
+  foreach ($inv in $Invoices) {
+    try {
+      Invoke-Gql 'mutation($input: CreateInvoiceInput!) { createInvoice(input: $input) { id invoiceNumber totalAmount } }' @{
+        input = @{
+          partnerId   = $PartnerId
+          description = $inv.description
+          amount      = $inv.amount
+        }
+      } | Out-Null
+      Write-Host "    Invoice created: $($inv.description) (EUR $($inv.amount))"
+    }
+    catch {
+      Write-Host "    Invoice failed: $($inv.description) - $($_.Exception.Message)" -ForegroundColor Yellow
+      Write-Host "      (needs a real Stripe test key in appsettings/user-secrets - see .env.example)" -ForegroundColor Yellow
+    }
+  }
+}
+
 try {
   Write-Host "Seeding demo data into $ApiBase ..."
+  Ensure-LoggedIn
 
   # ---------------- Pantrix ----------------
   Write-Host "Pantrix"
   $pantrix = Ensure-Partner @{
     companyName  = "Pantrix"
-    companyEmail = "partners@pantrix.example.com"
+    companyEmail = "partners@pantrix.$EmailTag.example.com"
     country      = "Pakistan"
     industry     = "Software and Design"
   }
@@ -136,7 +227,7 @@ try {
   Write-Host "Nexora"
   $nexora = Ensure-Partner @{
     companyName  = "Nexora"
-    companyEmail = "partners@nexora.example.com"
+    companyEmail = "partners@nexora.$EmailTag.example.com"
     country      = "Germany"
     industry     = "Logistics"
   }
@@ -157,6 +248,94 @@ try {
     scopes = @("customs:write")
   }
 
+  # ---------------- BrightForge (new) ----------------
+  Write-Host "BrightForge"
+  $brightforge = Ensure-Partner @{
+    companyName  = "BrightForge Manufacturing"
+    companyEmail = "partners@brightforge.$EmailTag.example.com"
+    country      = "United States"
+    industry     = "Manufacturing"
+  }
+
+  $bfOrders = Ensure-Integration $brightforge @{
+    name = "Purchase order sync"; type = "REST_API"
+    endpointUrl = "https://api.brightforge.example.com/v2/purchase-orders"
+    scopes = @("orders:read", "orders:write")
+  }
+  $bfQuality = Ensure-Integration $brightforge @{
+    name = "Quality control webhook"; type = "WEBHOOK"
+    endpointUrl = "https://hooks.brightforge.example.com/qc"
+    scopes = @("quality:read")
+  }
+
+  # ---------------- Solvara (new) ----------------
+  Write-Host "Solvara"
+  $solvara = Ensure-Partner @{
+    companyName  = "Solvara Analytics"
+    companyEmail = "partners@solvara.$EmailTag.example.com"
+    country      = "Canada"
+    industry     = "Fintech"
+  }
+
+  $svReporting = Ensure-Integration $solvara @{
+    name = "Reporting API"; type = "REST_API"
+    endpointUrl = "https://api.solvara.example.com/v1/reports"
+    scopes = @("reports:read")
+  }
+  $svLedger = Ensure-Integration $solvara @{
+    name = "Ledger sync"; type = "GRAPHQL"
+    endpointUrl = "https://api.solvara.example.com/graphql"
+    scopes = @("ledger:read", "ledger:write")
+  }
+
+  # ---------------- Kestrel Freight (new) ----------------
+  Write-Host "Kestrel Freight"
+  $kestrel = Ensure-Partner @{
+    companyName  = "Kestrel Freight Co"
+    companyEmail = "partners@kestrelfreight.$EmailTag.example.com"
+    country      = "United Kingdom"
+    industry     = "Logistics"
+  }
+
+  $kfTracking = Ensure-Integration $kestrel @{
+    name = "Fleet tracking webhook"; type = "WEBHOOK"
+    endpointUrl = "https://hooks.kestrelfreight.example.com/fleet"
+    scopes = @("fleet:read")
+  }
+  $kfCustoms = Ensure-Integration $kestrel @{
+    name = "Customs EDI"; type = "EDI"
+    endpointUrl = "https://edi.kestrelfreight.example.com/customs"
+    scopes = @("customs:write")
+  }
+
+  # ---------------- Invoices (fake, per partner) ----------------
+  Write-Host "Creating invoices ..."
+  Ensure-Invoices $pantrix "Pantrix" @(
+    @{ description = "UI/UX design sprint - Q3 product refresh"; amount = 1450.00 }
+    @{ description = "Order sync integration - monthly support"; amount = 320.00 }
+    @{ description = "Product catalog feed - setup fee"; amount = 680.00 }
+  )
+  Ensure-Invoices $nexora "Nexora" @(
+    @{ description = "Shipment tracking integration - onboarding"; amount = 2100.00 }
+    @{ description = "Customs EDI channel - monthly fee"; amount = 540.00 }
+    @{ description = "Invoice feed - Q3 usage"; amount = 975.50 }
+  )
+  Ensure-Invoices $brightforge "BrightForge" @(
+    @{ description = "Purchase order sync - implementation"; amount = 3200.00 }
+    @{ description = "Quality control webhook - monthly support"; amount = 410.00 }
+    @{ description = "API rate limit upgrade"; amount = 150.00 }
+  )
+  Ensure-Invoices $solvara "Solvara" @(
+    @{ description = "Reporting API integration - onboarding"; amount = 1890.00 }
+    @{ description = "Ledger sync - monthly support"; amount = 725.00 }
+    @{ description = "Custom compliance report build"; amount = 1120.00 }
+  )
+  Ensure-Invoices $kestrel "Kestrel Freight" @(
+    @{ description = "Fleet tracking webhook - setup"; amount = 980.00 }
+    @{ description = "Customs EDI channel - monthly fee"; amount = 560.00 }
+    @{ description = "Route optimisation module"; amount = 1340.00 }
+  )
+
   # ---------------- Activity feed events ----------------
   Write-Host "Sending sample webhook events ..."
   Send-Webhook $pxInventory "stock.updated"   @{ sku = "PX-1042"; quantity = 128 }
@@ -165,6 +344,10 @@ try {
   Send-Webhook $nxInvoices  "invoice.paid"    @{ invoiceId = "NX-2231"; amount = 1840 }
   Send-Webhook $nxShipments "shipment.sent"   @{ trackingId = "NX-TRK-55821"; carrier = "DHL" }
   Send-Webhook $nxShipments "shipment.delivered" @{ trackingId = "NX-TRK-55790" }
+  Send-Webhook $bfOrders    "order.created"   @{ orderId = "BF-77410"; total = 3200.00 }
+  Send-Webhook $bfQuality   "qc.flagged"      @{ batchId = "BF-BATCH-119"; issue = "tolerance out of range" }
+  Send-Webhook $svReporting "report.generated" @{ reportId = "SV-RPT-0042" }
+  Send-Webhook $kfTracking  "fleet.location.updated" @{ vehicleId = "KF-VAN-08"; status = "en route" }
 
   # One failed outbound event so the feed shows a red dot too.
   Invoke-Gql 'mutation($input: RecordWebhookEventInput!) { recordWebhookEvent(input: $input) { id } }' @{
@@ -180,15 +363,22 @@ try {
   } | Out-Null
 
   # ---------------- Final statuses (set last, webhooks auto-connect) ----------------
-  Set-IntegrationStatus $pxOrders    "CONNECTED"
-  Set-IntegrationStatus $pxInventory "CONNECTED"
-  Set-IntegrationStatus $pxCatalog   "PAUSED"
-  Set-IntegrationStatus $nxInvoices  "CONNECTED"
-  Set-IntegrationStatus $nxShipments "CONNECTED"
-  Set-IntegrationStatus $nxEdi       "FAILING"
+  Set-IntegrationStatus $pxOrders     "CONNECTED"
+  Set-IntegrationStatus $pxInventory  "CONNECTED"
+  Set-IntegrationStatus $pxCatalog    "PAUSED"
+  Set-IntegrationStatus $nxInvoices   "CONNECTED"
+  Set-IntegrationStatus $nxShipments  "CONNECTED"
+  Set-IntegrationStatus $nxEdi        "FAILING"
+  Set-IntegrationStatus $bfOrders     "CONNECTED"
+  Set-IntegrationStatus $bfQuality    "CONNECTED"
+  Set-IntegrationStatus $svReporting  "CONNECTED"
+  Set-IntegrationStatus $svLedger     "PAUSED"
+  Set-IntegrationStatus $kfTracking   "CONNECTED"
+  Set-IntegrationStatus $kfCustoms    "CONNECTED"
 
   Write-Host ""
-  Write-Host "Done. Open the dashboard and check Partners, Integrations and Live activity."
+  Write-Host "Done. 5 partners, their integrations and invoices are seeded."
+  Write-Host "Open the dashboard and check Partners, Invoices and Live activity."
 }
 catch {
   Write-Host ""

@@ -1,12 +1,7 @@
-export type PartnerStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "OFFBOARDED";
-export type IntegrationType =
-  | "REST_API"
-  | "GRAPHQL"
-  | "WEBHOOK"
-  | "FILE_SYNC"
-  | "EDI";
-export type IntegrationStatus = "DRAFT" | "CONNECTED" | "FAILING" | "PAUSED";
-export type UserRole = "ADMIN" | "OPERATOR" | "VIEWER";
+export type PartnerStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'OFFBOARDED';
+export type IntegrationType = 'REST_API' | 'GRAPHQL' | 'WEBHOOK' | 'FILE_SYNC' | 'EDI';
+export type IntegrationStatus = 'DRAFT' | 'CONNECTED' | 'FAILING' | 'PAUSED';
+export type UserRole = 'ADMIN' | 'OPERATOR' | 'VIEWER';
 
 export interface Partner {
   id: string;
@@ -61,7 +56,32 @@ export interface AppUser {
   role: UserRole;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  vatNumber: string;
+  iban: string;
+}
+
 export interface AuthPayload {
   token: string;
   user: AppUser;
+  company: Company;
+}
+
+export type InvoiceStatus = 'PENDING' | 'PAID' | 'CANCELLED';
+
+export interface Invoice {
+  id: string;
+  partnerId: string;
+  invoiceNumber: string;
+  description: string;
+  amount: number;
+  vatAmount: number;
+  totalAmount: number;
+  currency: string;
+  status: InvoiceStatus;
+  stripePaymentLinkUrl?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
 }

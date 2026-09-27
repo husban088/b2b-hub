@@ -248,6 +248,16 @@ code {
   border-radius: 4px;
 }
 
+.hint a {
+  color: var(--green-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hint a:hover {
+  text-decoration: underline;
+}
+
 /* ---------- Tablet / mobile ---------- */
 
 @media (max-width: 860px) {

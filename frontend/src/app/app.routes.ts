@@ -1,44 +1,19 @@
-import { Routes } from "@angular/router";
-import { authGuard } from "./core/guards/auth.guard";
+import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
+  { path: 'login', loadComponent: () => import('./pages/login/login.component').then(m => m.LoginComponent) },
+  { path: 'signup', loadComponent: () => import('./pages/signup/signup.component').then(m => m.SignupComponent) },
   {
-    path: "login",
-    loadComponent: () =>
-      import("./pages/login/login.component").then((m) => m.LoginComponent),
-  },
-  {
-    path: "signup",
-    loadComponent: () =>
-      import("./pages/signup/signup.component").then((m) => m.SignupComponent),
-  },
-  {
-    path: "",
+    path: '',
     canActivate: [authGuard],
     children: [
-      { path: "", redirectTo: "dashboard", pathMatch: "full" },
-      {
-        path: "dashboard",
-        loadComponent: () =>
-          import("./pages/dashboard/dashboard.component").then(
-            (m) => m.DashboardComponent,
-          ),
-      },
-      {
-        path: "partners",
-        loadComponent: () =>
-          import("./pages/partners/partners.component").then(
-            (m) => m.PartnersComponent,
-          ),
-      },
-      {
-        path: "integrations",
-        loadComponent: () =>
-          import("./pages/integrations/integrations.component").then(
-            (m) => m.IntegrationsComponent,
-          ),
-      },
-    ],
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'dashboard', loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
+      { path: 'partners', loadComponent: () => import('./pages/partners/partners.component').then(m => m.PartnersComponent) },
+      { path: 'invoices', loadComponent: () => import('./pages/invoices/invoices.component').then(m => m.InvoicesComponent) },
+      { path: 'integrations', loadComponent: () => import('./pages/integrations/integrations.component').then(m => m.IntegrationsComponent) }
+    ]
   },
-  { path: "**", redirectTo: "dashboard" },
+  { path: '**', redirectTo: 'dashboard' }
 ];

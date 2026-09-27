@@ -11,11 +11,15 @@
   <ItemGroup>
     <!-- GraphQL server -->
     <PackageReference Include="HotChocolate.AspNetCore" Version="13.9.0" />
+    <PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="13.9.0" />
     <PackageReference Include="HotChocolate.Data" Version="13.9.0" />
     <PackageReference Include="HotChocolate.Subscriptions.InMemory" Version="13.9.0" />
 
     <!-- MongoDB -->
     <PackageReference Include="MongoDB.Driver" Version="2.25.0" />
+
+    <!-- Kafka producer (event bus for the EDI/notification/analytics services) -->
+    <PackageReference Include="Confluent.Kafka" Version="2.5.3" />
 
     <!-- Cloudinary (image storage) -->
     <PackageReference Include="CloudinaryDotNet" Version="1.23.0" />
@@ -28,6 +32,10 @@
     <PackageReference Include="AWSSDK.S3" Version="3.7.400" />
     <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.400" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.301" />
+
+    <!-- Invoicing: PDF generation + Stripe payment links -->
+    <PackageReference Include="QuestPDF" Version="2024.12.3" />
+    <PackageReference Include="Stripe.net" Version="47.4.0" />
 
     <!-- Utilities -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
