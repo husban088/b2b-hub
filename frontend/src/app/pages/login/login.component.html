@@ -125,16 +125,16 @@
         <button
           type="submit"
           class="btn btn-primary full-width"
+          [class.is-loading]="loading()"
           [disabled]="loading() || form.invalid"
         >
+          <span *ngIf="loading()" class="btn-spinner" aria-hidden="true"></span>
           {{ loading() ? "Signing in…" : "Sign in" }}
         </button>
       </form>
 
       <p class="hint">
-        No account yet? Register one through the <code>register</code> GraphQL
-        mutation documented in the README — the first account should use the
-        Admin role.
+        Don't have an account? <a routerLink="/signup">Create one</a>
       </p>
     </div>
   </main>

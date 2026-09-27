@@ -25,6 +25,10 @@ export class PartnersComponent implements OnInit {
   showForm = signal(false);
   saving = signal(false);
 
+  /** Partner id currently being removed — drives that row's own spinner and blocks a
+   * second click on the same row while the request is in flight. */
+  removingId = signal<string | null>(null);
+
   form = {
     companyName: "",
     companyEmail: "",
@@ -100,6 +104,8 @@ export class PartnersComponent implements OnInit {
   }
 
   async remove(partner: Partner): Promise<void> {
+    if (this.removingId()) return;
+
     const ok = await this.dialog.confirm({
       title: "Remove partner?",
       message: `Remove ${partner.companyName}? This can't be undone.`,
@@ -108,13 +114,19 @@ export class PartnersComponent implements OnInit {
       tone: "danger",
     });
     if (!ok) return;
-    await firstValueFrom(
-      this.apollo.mutate({
-        mutation: DELETE_PARTNER,
-        variables: { id: partner.id },
-      }),
-    );
-    this.refresh();
+
+    this.removingId.set(partner.id);
+    try {
+      await firstValueFrom(
+        this.apollo.mutate({
+          mutation: DELETE_PARTNER,
+          variables: { id: partner.id },
+        }),
+      );
+      this.refresh();
+    } finally {
+      this.removingId.set(null);
+    }
   }
 
   statusClass(status: PartnerStatus): string {

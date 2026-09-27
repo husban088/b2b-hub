@@ -32,6 +32,10 @@ export class IntegrationsComponent implements OnInit {
   showForm = signal(false);
   saving = signal(false);
 
+  /** Integration id currently being deleted — drives that row's own spinner and blocks a
+   * second click on the same row while the request is in flight. */
+  removingId = signal<string | null>(null);
+
   types: IntegrationType[] = [
     "REST_API",
     "GRAPHQL",
@@ -138,6 +142,8 @@ export class IntegrationsComponent implements OnInit {
   }
 
   async remove(integration: Integration): Promise<void> {
+    if (this.removingId()) return;
+
     const ok = await this.dialog.confirm({
       title: "Delete integration?",
       message: `Delete integration "${integration.name}"? This can't be undone.`,
@@ -146,13 +152,19 @@ export class IntegrationsComponent implements OnInit {
       tone: "danger",
     });
     if (!ok) return;
-    await firstValueFrom(
-      this.apollo.mutate({
-        mutation: DELETE_INTEGRATION,
-        variables: { id: integration.id },
-      }),
-    );
-    this.refresh();
+
+    this.removingId.set(integration.id);
+    try {
+      await firstValueFrom(
+        this.apollo.mutate({
+          mutation: DELETE_INTEGRATION,
+          variables: { id: integration.id },
+        }),
+      );
+      this.refresh();
+    } finally {
+      this.removingId.set(null);
+    }
   }
 
   statusClass(status: IntegrationStatus): string {

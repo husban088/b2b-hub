@@ -64,8 +64,10 @@
     <button
       type="submit"
       class="btn btn-primary"
+      [class.is-loading]="saving()"
       [disabled]="saving() || f.invalid"
     >
+      <span *ngIf="saving()" class="btn-spinner" aria-hidden="true"></span>
       {{ saving() ? "Saving…" : "Create integration" }}
     </button>
   </form>
@@ -110,8 +112,18 @@
           </div>
         </td>
         <td class="actions-cell">
-          <button class="btn btn-danger" (click)="remove(integration)">
-            Delete
+          <button
+            class="btn btn-danger"
+            [class.is-loading]="removingId() === integration.id"
+            [disabled]="removingId() === integration.id"
+            (click)="remove(integration)"
+          >
+            <span
+              *ngIf="removingId() === integration.id"
+              class="btn-spinner"
+              aria-hidden="true"
+            ></span>
+            {{ removingId() === integration.id ? "Deleting…" : "Delete" }}
           </button>
         </td>
       </tr>

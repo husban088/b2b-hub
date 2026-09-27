@@ -1,0 +1,146 @@
+<div class="page-head row">
+  <div>
+    <h1>Invoices</h1>
+    <p class="lede">
+      Create invoices, share the "Pay Now" link, download the PDF.
+    </p>
+  </div>
+  <button class="btn btn-primary" (click)="toggleForm()">
+    {{ showForm() ? "Cancel" : "+ New Invoice" }}
+  </button>
+</div>
+
+<div class="panel form-panel" *ngIf="showForm()">
+  <form (ngSubmit)="createInvoice()" #f="ngForm" novalidate>
+    <div class="form-grid">
+      <div class="field">
+        <label for="partnerId">Client</label>
+        <select
+          id="partnerId"
+          name="partnerId"
+          [(ngModel)]="form.partnerId"
+          required
+        >
+          <option value="" disabled>Select a client…</option>
+          <option *ngFor="let p of partners()" [value]="p.id">
+            {{ p.companyName }}
+          </option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="amount">Amount (EUR, before VAT)</label>
+        <input
+          id="amount"
+          name="amount"
+          type="number"
+          min="0"
+          step="0.01"
+          [(ngModel)]="form.amount"
+          required
+          placeholder="5000"
+        />
+      </div>
+
+      <div class="field span-2">
+        <label for="description">Work done</label>
+        <input
+          id="description"
+          name="description"
+          type="text"
+          [(ngModel)]="form.description"
+          required
+          placeholder="Website Development"
+        />
+      </div>
+    </div>
+
+    <p class="amount-preview" *ngIf="form.amount">
+      VAT (19%): €{{ vatPreview() }} — Total: €{{ totalPreview() }}
+    </p>
+
+    <p class="error" role="alert" *ngIf="formError() as msg">{{ msg }}</p>
+
+    <button
+      type="submit"
+      class="btn btn-primary"
+      [class.is-loading]="saving()"
+      [disabled]="saving() || f.invalid"
+    >
+      <span *ngIf="saving()" class="btn-spinner" aria-hidden="true"></span>
+      {{ saving() ? "Generating invoice…" : "Generate Invoice" }}
+    </button>
+  </form>
+</div>
+
+<div class="panel table-panel">
+  <table class="data-table" *ngIf="!loading(); else loadingTpl">
+    <thead>
+      <tr>
+        <th>Invoice #</th>
+        <th>Client</th>
+        <th>Description</th>
+        <th>Total (EUR)</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let inv of invoices()">
+        <td data-label="Invoice #">{{ inv.invoiceNumber }}</td>
+        <td data-label="Client">{{ clientName(inv.partnerId) }}</td>
+        <td data-label="Description">{{ inv.description }}</td>
+        <td data-label="Total (EUR)">{{ inv.totalAmount.toFixed(2) }}</td>
+        <td data-label="Status">
+          <span class="status-dot" [ngClass]="statusClass(inv.status)"></span>
+          {{ inv.status }}
+        </td>
+        <td class="actions-cell">
+          <div class="actions">
+            <a
+              *ngIf="inv.stripePaymentLinkUrl && inv.status === 'PENDING'"
+              [href]="inv.stripePaymentLinkUrl"
+              target="_blank"
+              rel="noopener"
+              class="btn btn-primary btn-sm"
+            >
+              Pay Now
+            </a>
+            <button
+              class="btn btn-sm"
+              [class.is-loading]="downloadingId() === inv.id"
+              [disabled]="downloadingId() === inv.id || deletingId() === inv.id"
+              (click)="downloadPdf(inv)"
+            >
+              <span
+                *ngIf="downloadingId() === inv.id"
+                class="btn-spinner"
+                aria-hidden="true"
+              ></span>
+              {{ downloadingId() === inv.id ? "Downloading…" : "Download PDF" }}
+            </button>
+            <button
+              class="btn btn-danger btn-sm"
+              [class.is-loading]="deletingId() === inv.id"
+              [disabled]="deletingId() === inv.id || downloadingId() === inv.id"
+              (click)="remove(inv)"
+            >
+              <span
+                *ngIf="deletingId() === inv.id"
+                class="btn-spinner"
+                aria-hidden="true"
+              ></span>
+              {{ deletingId() === inv.id ? "Deleting…" : "Delete" }}
+            </button>
+          </div>
+        </td>
+      </tr>
+      <tr *ngIf="invoices().length === 0">
+        <td colspan="6" class="empty-row">
+          No invoices yet — create your first one above.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <ng-template #loadingTpl><p class="loading-text">Loading…</p></ng-template>
+</div>

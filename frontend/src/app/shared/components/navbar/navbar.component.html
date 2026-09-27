@@ -15,6 +15,14 @@
     <span class="avatar" aria-hidden="true">{{
       user.fullName.charAt(0) | uppercase
     }}</span>
-    <button class="btn signout" (click)="signOut()">Sign out</button>
+    <button
+      class="btn signout"
+      [class.is-loading]="signingOut()"
+      [disabled]="signingOut()"
+      (click)="signOut()"
+    >
+      <span *ngIf="signingOut()" class="btn-spinner" aria-hidden="true"></span>
+      {{ signingOut() ? "Signing out…" : "Sign out" }}
+    </button>
   </div>
 </header>

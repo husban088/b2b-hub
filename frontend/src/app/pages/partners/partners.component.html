@@ -52,8 +52,10 @@
     <button
       type="submit"
       class="btn btn-primary"
+      [class.is-loading]="saving()"
       [disabled]="saving() || f.invalid"
     >
+      <span *ngIf="saving()" class="btn-spinner" aria-hidden="true"></span>
       {{ saving() ? "Saving…" : "Create partner" }}
     </button>
   </form>
@@ -95,8 +97,18 @@
           </div>
         </td>
         <td class="actions-cell">
-          <button class="btn btn-danger" (click)="remove(partner)">
-            Remove
+          <button
+            class="btn btn-danger"
+            [class.is-loading]="removingId() === partner.id"
+            [disabled]="removingId() === partner.id"
+            (click)="remove(partner)"
+          >
+            <span
+              *ngIf="removingId() === partner.id"
+              class="btn-spinner"
+              aria-hidden="true"
+            ></span>
+            {{ removingId() === partner.id ? "Removing…" : "Remove" }}
           </button>
         </td>
       </tr>

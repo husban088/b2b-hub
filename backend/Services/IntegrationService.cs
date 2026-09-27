@@ -7,6 +7,11 @@ namespace B2BIntegrationHub.Services;
 public interface IIntegrationService
 {
     Task<List<Integration>> GetAllAsync();
+
+    /// <summary>Only the integrations that belong to one of these partner IDs -
+    /// used to scope the integrations list to the logged-in user's own company.</summary>
+    Task<List<Integration>> GetAllForPartnersAsync(IReadOnlyCollection<string> partnerIds);
+
     Task<List<Integration>> GetByPartnerIdAsync(string partnerId);
     Task<Integration?> GetByIdAsync(string id);
     Task<Integration> CreateAsync(Integration integration);
@@ -22,6 +27,16 @@ public class IntegrationService : IIntegrationService
 
     public async Task<List<Integration>> GetAllAsync() =>
         await _context.Integrations.Find(_ => true).SortByDescending(i => i.CreatedAt).ToListAsync();
+
+    public async Task<List<Integration>> GetAllForPartnersAsync(IReadOnlyCollection<string> partnerIds)
+    {
+        if (partnerIds.Count == 0) return new List<Integration>();
+
+        return await _context.Integrations
+            .Find(i => partnerIds.Contains(i.PartnerId))
+            .SortByDescending(i => i.CreatedAt)
+            .ToListAsync();
+    }
 
     public async Task<List<Integration>> GetByPartnerIdAsync(string partnerId) =>
         await _context.Integrations.Find(i => i.PartnerId == partnerId).ToListAsync();
@@ -44,7 +59,6 @@ public class IntegrationService : IIntegrationService
             .Set(i => i.UpdatedAt, DateTime.UtcNow)
             .Set(i => i.LastSyncAt, DateTime.UtcNow);
 
-        // UpdateOneAsync avoids the ambiguous FindOneAndUpdateAsync overload error (CS0121).
         var result = await _context.Integrations.UpdateOneAsync(i => i.Id == id, update);
         if (result.MatchedCount == 0) return null;
 

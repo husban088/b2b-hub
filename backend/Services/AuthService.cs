@@ -17,7 +17,7 @@ public class JwtSettings
     public int ExpiryMinutes { get; set; } = 120;
 }
 
-public record AuthResult(string Token, AppUser User);
+public record AuthResult(string Token, AppUser User, Company Company);
 
 /// <summary>
 /// Thrown when a login attempt fails. <see cref="Code"/> tells the frontend which input to flag:
@@ -35,7 +35,15 @@ public class LoginFailedException : Exception
 
 public interface IAuthService
 {
-    Task<AppUser> RegisterAsync(string fullName, string email, string password, UserRole role);
+    /// <summary>
+    /// Creates a brand new Company (tenant) plus its first user, who is always Admin.
+    /// This is the "Company Login" signup: BMW signs up once here and gets its own
+    /// isolated space - everything BMW creates afterwards is tagged with this CompanyId.
+    /// </summary>
+    Task<AuthResult> RegisterAsync(
+        string fullName, string email, string password,
+        string companyName, string vatNumber, string iban);
+
     Task<AuthResult?> LoginAsync(string email, string password);
 }
 
@@ -50,7 +58,9 @@ public class AuthService : IAuthService
         _jwtSettings = jwtSettings.Value;
     }
 
-    public async Task<AppUser> RegisterAsync(string fullName, string email, string password, UserRole role)
+    public async Task<AuthResult> RegisterAsync(
+        string fullName, string email, string password,
+        string companyName, string vatNumber, string iban)
     {
         // Always compare/store the lowercase email so "A@x.com" and "a@x.com" are the same account.
         var normalizedEmail = email.Trim().ToLowerInvariant();
@@ -61,16 +71,28 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("A user with this email already exists.");
         }
 
+        // Step 1: create the tenant (Company) - this is what makes multi-tenant work.
+        var company = new Company
+        {
+            Name = companyName,
+            VatNumber = vatNumber,
+            Iban = iban
+        };
+        await _context.Companies.InsertOneAsync(company);
+
+        // Step 2: the person who signs up a company is always its Admin.
         var user = new AppUser
         {
+            CompanyId = company.Id,
             FullName = fullName,
             Email = normalizedEmail,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-            Role = role
+            Role = UserRole.Admin
         };
-
         await _context.Users.InsertOneAsync(user);
-        return user;
+
+        var token = GenerateToken(user);
+        return new AuthResult(token, user, company);
     }
 
     public async Task<AuthResult?> LoginAsync(string email, string password)
@@ -88,8 +110,14 @@ public class AuthService : IAuthService
             throw new LoginFailedException("WRONG_PASSWORD", "Incorrect password. Please try again.");
         }
 
+        var company = await _context.Companies.Find(c => c.Id == user.CompanyId).FirstOrDefaultAsync();
+        if (company == null)
+        {
+            throw new LoginFailedException("COMPANY_NOT_FOUND", "This account is not linked to a company anymore.");
+        }
+
         var token = GenerateToken(user);
-        return new AuthResult(token, user);
+        return new AuthResult(token, user, company);
     }
 
     private string GenerateToken(AppUser user)
@@ -99,7 +127,10 @@ public class AuthService : IAuthService
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            // This is the claim CurrentUserService reads on every request to filter
+            // data down to just this user's company (multi-tenant isolation).
+            new Claim("companyId", user.CompanyId)
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));

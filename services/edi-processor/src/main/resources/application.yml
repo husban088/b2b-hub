@@ -1,0 +1,37 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: edi-processor
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    properties:
+      # Defaults to plain unauthenticated Kafka (local/Docker). Set these three env vars
+      # to point at a hosted broker instead (e.g. Upstash Kafka's free tier) without
+      # touching any code - useful when running services natively without installing Kafka.
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+      sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
+      sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG:}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/b2b_integration_hub}
+
+nexbridge:
+  kafka:
+    topic: ${EDI_KAFKA_TOPIC:webhook.events.v1}
+    consumer-group: ${EDI_CONSUMER_GROUP:edi-processor}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.nexbridge.ediprocessor: INFO

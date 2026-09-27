@@ -1,0 +1,33 @@
+.amount-preview {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin: -8px 0 12px;
+}
+
+.error {
+  color: var(--signal-danger);
+  font-size: 0.85rem;
+  margin: -8px 0 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 860px) {
+  .actions {
+    justify-content: stretch;
+    width: 100%;
+  }
+  .actions .btn {
+    flex: 1;
+  }
+}

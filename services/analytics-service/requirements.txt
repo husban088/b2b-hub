@@ -1,0 +1,10 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+motor==3.4.0
+pymongo==4.7.2
+# NOTE: plain "kafka-python" is unmaintained and crashes on Python 3.12
+# (ModuleNotFoundError: kafka.vendor.six.moves). kafka-python-ng is the
+# maintained fork with the exact same "from kafka import ..." API.
+kafka-python-ng==2.2.3
+pydantic==2.7.1
+python-dateutil==2.9.0.post0

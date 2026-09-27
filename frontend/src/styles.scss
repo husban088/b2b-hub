@@ -172,6 +172,31 @@ textarea {
   cursor: not-allowed;
 }
 
+/* ---------- Loading spinner (used on any button mid-action) ---------- */
+
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.65s linear infinite;
+}
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.btn.is-loading {
+  cursor: wait;
+}
+.btn-danger .btn-spinner {
+  border-color: var(--signal-danger);
+  border-right-color: transparent;
+}
+
 .btn-primary {
   background: linear-gradient(180deg, var(--green-700), var(--green-800));
   border-color: var(--green-800);
