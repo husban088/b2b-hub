@@ -1,7 +1,12 @@
-export type PartnerStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'OFFBOARDED';
-export type IntegrationType = 'REST_API' | 'GRAPHQL' | 'WEBHOOK' | 'FILE_SYNC' | 'EDI';
-export type IntegrationStatus = 'DRAFT' | 'CONNECTED' | 'FAILING' | 'PAUSED';
-export type UserRole = 'ADMIN' | 'OPERATOR' | 'VIEWER';
+export type PartnerStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "OFFBOARDED";
+export type IntegrationType =
+  | "REST_API"
+  | "GRAPHQL"
+  | "WEBHOOK"
+  | "FILE_SYNC"
+  | "EDI";
+export type IntegrationStatus = "DRAFT" | "CONNECTED" | "FAILING" | "PAUSED";
+export type UserRole = "ADMIN" | "OPERATOR" | "VIEWER";
 
 export interface Partner {
   id: string;

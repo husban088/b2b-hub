@@ -8,7 +8,7 @@ namespace B2BIntegrationHub.GraphQL;
 public record CreatePartnerInput(string CompanyName, string CompanyEmail, string Country, string Industry);
 public record UpdatePartnerInput(string Id, string CompanyName, string Country, string Industry, PartnerStatus Status);
 public record CreateIntegrationInput(string PartnerId, string Name, IntegrationType Type, string EndpointUrl, string[] Scopes);
-public record RegisterInput(string FullName, string Email, string Password, UserRole Role);
+public record RegisterInput(string FullName, string Email, string Password, string CompanyName, string VatNumber, string Iban);
 public record LoginInput(string Email, string Password);
 public record RecordWebhookEventInput(string IntegrationId, string Direction, string EventType, int StatusCode, bool Success, string? Payload, string? ErrorMessage);
 
@@ -87,11 +87,14 @@ public class Mutation
             ErrorMessage = input.ErrorMessage
         });
 
-    public async Task<AppUser> Register(RegisterInput input, [Service] IAuthService auth)
+    public async Task<AuthPayload> Register(RegisterInput input, [Service] IAuthService auth)
     {
         try
         {
-            return await auth.RegisterAsync(input.FullName, input.Email, input.Password, input.Role);
+            var result = await auth.RegisterAsync(
+                input.FullName, input.Email, input.Password,
+                input.CompanyName, input.VatNumber, input.Iban);
+            return new AuthPayload(result.Token, result.User);
         }
         catch (InvalidOperationException ex)
         {
